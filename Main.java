@@ -9,6 +9,7 @@ import javafx.scene.input.KeyCombination;
 public class Main extends Application {
     @Override
     public void start(Stage stage) {
+
         // Full screen resolution
         double width = Screen.getPrimary().getBounds().getWidth();
         double height = Screen.getPrimary().getBounds().getHeight();

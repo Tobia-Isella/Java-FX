@@ -26,6 +26,8 @@ import javafx.util.Duration;
 
 
 
+
+
 public class Game extends Canvas {
     private final double width, height;
 
@@ -43,12 +45,16 @@ public class Game extends Canvas {
     private Button optionsButton;
     private Button mainMenuButton;
     private Button dropdownButton;
-    private Button healthButton;
-    private Button exitButton;
-    private Button speedButton;
+
+    private UpgradeButton healthButton = new UpgradeButton("HEALTH +1", 100);
+    private UpgradeButton speedButton = new UpgradeButton("SPEED +1", 150);
+
+    private Button exitButton;  
     private VBox dropdownOptions;
     private boolean dropdownVisible = false;
     private Label arrowLabel;
+
+
 
     private int cameraX, cameraY;
 
@@ -68,6 +74,11 @@ public class Game extends Canvas {
     private final int MAX_WAVES = 10;
 
     private int score = 0;
+
+
+    String playerUUID = AccountManager.getOrCreateUUID();
+    int coins = AccountManager.getCoinsFromServer(playerUUID); // get existing or 0
+
     
 
     private enum GameState {
@@ -94,6 +105,8 @@ public class Game extends Canvas {
 
         setOnMouseClicked(e -> handleMouseClick(e));
 
+        AccountManager.registerUUIDWithServer(coins);
+       
         gc = getGraphicsContext2D();
 
         player = new Character(5000, 5000, 100, 100);
@@ -111,6 +124,8 @@ public class Game extends Canvas {
         
             if (runners.size() >= 4 ) break;
         }
+
+        System.out.println("Player UUID: " + playerUUID);
 
         for (int i = 0; i < 1000; i++) {
             double x = Math.random() * WORLD_WIDTH;
@@ -165,7 +180,7 @@ public class Game extends Canvas {
                         break;
 
                     case END_SCREEN:
-
+                        
                         break;
                     
                     case GAME_PAUSED:
@@ -356,6 +371,9 @@ public class Game extends Canvas {
         
         gc.setFill(Color.BLACK);
         gc.fillText("SCORE " + score, 10, 40);
+
+        gc.setFill(Color.BLACK);
+        gc.fillText("COINS " + coins, 10, 60);
         
 
         gc.setFill(Color.BLACK);
@@ -500,18 +518,15 @@ public class Game extends Canvas {
         buttonContent.setAlignment(Pos.CENTER);
         dropdownButton.setGraphic(buttonContent);
     
-        healthButton = new Button("HEALTH +1");
-        speedButton = new Button("SPEED +1");
+        setupSmallButton(healthButton.button, "HEALTH +1");
+        setupSmallButton(speedButton.button, "SPEED +1");
     
-        setupSmallButton(healthButton, "HEALTH +1");
-        setupSmallButton(speedButton, "SPEED +1");
-    
-        dropdownOptions = new VBox(10, healthButton, speedButton);
+        dropdownOptions = new VBox(10, healthButton.button, speedButton.button);
         dropdownOptions.setVisible(false);
         dropdownOptions.setMouseTransparent(true);
         dropdownOptions.setPickOnBounds(false);
     
-        // Bind dropdown position relative to button
+        // Bind dropdown position relative to buttonc
     
         Pane dropdownWrapper = new Pane(dropdownOptions);
         dropdownWrapper.setPickOnBounds(false);
