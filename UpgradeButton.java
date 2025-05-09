@@ -45,6 +45,9 @@ public class UpgradeButton {
         """));
     }
 
+    public void updateButtonText() {
+        button.setText(text + " ($" + cost + ")");
+    }
 
     public int getcost() { return (int) cost; }
 

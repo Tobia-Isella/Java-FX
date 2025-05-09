@@ -20,7 +20,7 @@ public class Player {
 
     public Player() {}
 
-    public Player(int x, int y, int dx, int dy, int width, int height, int health, Image pic) {
+    public Player(int x, int y, int dx, int dy, int speed, int width, int height, int health, Image pic) {
         this.x = x;
         this.y = y;
         this.dx = dx;
@@ -29,6 +29,7 @@ public class Player {
         this.height = height;
         this.pic = pic;
         this.health =health;
+        this.speed =speed;
     }
 
     public Player(int x, int y, int speed, int value, int width, int height, Image pic) {

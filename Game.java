@@ -45,9 +45,10 @@ public class Game extends Canvas {
     private Button optionsButton;
     private Button mainMenuButton;
     private Button dropdownButton;
+    
+    private UpgradeButton healthButton = new UpgradeButton("HEALTH +1", 10);
+    private UpgradeButton speedButton = new UpgradeButton("SPEED +1", 15);
 
-    private UpgradeButton healthButton = new UpgradeButton("HEALTH +1", 100);
-    private UpgradeButton speedButton = new UpgradeButton("SPEED +1", 150);
 
     private Button exitButton;  
     private VBox dropdownOptions;
@@ -498,7 +499,7 @@ public class Game extends Canvas {
 
     }
 
-        public void setupDropdownButton(Pane root) {
+    public void setupDropdownButton(Pane root) {
         dropdownButton = new Button();
         setupSmallButton(dropdownButton, "UPGRADES");
 
@@ -607,12 +608,18 @@ public class Game extends Canvas {
         """));
     
         button.setOnAction(e -> {
-            if (text.equals("SETTINGS")) {
-                System.out.println("Settings clicked!");
-                // Do something for settings
-            } else if (text.equals("CREDITS")) {
-                System.out.println("Credits clicked!");
-                // Do something for credits
+            if (text.equals("HEALTH +1") && score >= healthButton.getcost()) {
+                System.out.println("HEALTH clicked!");
+                player.setHealth(player.getHealth()+1);
+                score -= healthButton.getcost();
+                healthButton.setCost(healthButton.getcost() * 2);
+                healthButton.updateButtonText();
+            } else if (text.equals("SPEED +1") && score >= speedButton.getcost()) {
+                System.out.println("SPEED clicked!");
+                player.setSpeed(player.getSpeed()+1);
+                score -= speedButton.getcost();
+                speedButton.setCost(speedButton.getcost() * 2);
+                speedButton.updateButtonText();
             }
         });
     }
@@ -733,10 +740,10 @@ public class Game extends Canvas {
 
     public void handleKeyPress(KeyEvent e) {
         switch (e.getCode()) {
-            case W -> player.setDy(-10);
-            case A -> player.setDx(-10);
-            case S -> player.setDy(10);
-            case D -> player.setDx(10);
+            case W -> player.setDy(-10 - player.getSpeed());
+            case A -> player.setDx(-10 - player.getSpeed());
+            case S -> player.setDy(10 + player.getSpeed());
+            case D -> player.setDx(10 + player.getSpeed());
             case ESCAPE -> {
                 // Check if the current state is either GAME_SCREEN or GAME_PAUSED
                 if (currentState == GameState.GAME_SCREEN) {
