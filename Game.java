@@ -38,6 +38,7 @@ public class Game extends Canvas {
     private ArrayList<Runner> runners = new ArrayList<>();
     private ArrayList<Shooter> shooters = new ArrayList<>();
     private ArrayList<BigSquare> bigSquares = new ArrayList<>();
+    private ArrayList<Hexagon> hexagons = new ArrayList<>();
     private ArrayList<Missile> missiles = new ArrayList<>();
     private ArrayList<EnemyMissile> enemyMissiles = new ArrayList<>();
 
@@ -67,6 +68,7 @@ public class Game extends Canvas {
     private int TOTAL_RUNNERS;
     private int TOTAL_SHOOTERS;
     private int TOTAL_BIGSQUARES;
+    private int TOTAL_HEXAGONS;
 
 
     private int fps = 0; 
@@ -241,6 +243,10 @@ public class Game extends Canvas {
             bigSquare.moveTowardsPlayer(player.getX(), player.getY(), new ArrayList<>(bigSquares));
         }
 
+        for (Hexagon hexagon : hexagons) {
+            hexagon.moveTowardsPlayer(player.getX(), player.getY(), new ArrayList<>(hexagons));
+        }
+
         for (Shooter shooter : shooters) {
             shooter.HoverPlayer(player.getX(), player.getY(), new ArrayList<>(shooters));
             shooter.maybeFireMissile(enemyMissiles, player.getX(), player.getY());
@@ -363,6 +369,10 @@ public class Game extends Canvas {
         for (BigSquare bigSquare : bigSquares) {
             bigSquare.drawActor(gc, cameraX, cameraY);
         }
+        for (Hexagon hexagon : hexagons) {
+            hexagon.drawActor(gc, cameraX, cameraY);
+        }
+        
         
         
 
@@ -419,16 +429,18 @@ public class Game extends Canvas {
     
     public void startWave(int wave) {
         int numRunners = 5 + wave * 2;
-        int numShooters = (wave >= 3) ? 1 + wave / 2 : 0;
-        int numBigSquares = (wave >= 7) ? 1 + wave / 2 : 0;
+        int numShooters = (wave >= 5) ? 1 + wave / 2 : 0;
+        int numHexagons = (wave >= 3) ? 1 + wave * 2 : 0;
+        int numBigSquares = (wave >= 7) ?  wave / 3 : 0;
     
         long seed = System.nanoTime();
     
         int placedRunners = 0;
         int placedShooters = 0;
         int placedBigSquares = 0;
+        int placedHexagons = 0;
     
-        for (int i = 0; i < 10000 && (placedRunners < numRunners || placedShooters < numShooters || placedBigSquares < numBigSquares); i++) {
+        for (int i = 0; i < 10000 && (placedRunners < numRunners || placedShooters < numShooters || placedBigSquares < numBigSquares|| placedHexagons < numHexagons); i++) {
             double x = Math.random() * WORLD_WIDTH;
             double y = Math.random() * WORLD_HEIGHT;
             double value = OpenSimplex2S.noise2(seed, x * 0.001, y * 0.001);
@@ -439,6 +451,13 @@ public class Game extends Canvas {
                 placedBigSquares++;
                 continue;
             }
+
+            if (wave >= 0 && value > 0.6 && placedHexagons < numHexagons) {
+                hexagons.add(new Hexagon((int) x, (int) y, 50, 50, 10));
+                placedHexagons++;
+                continue;
+            }
+    
     
             // Try placing Shooter (only from wave 3 onward)
             if (wave >= 3 && value > 0.5 && placedShooters < numShooters) {
@@ -457,8 +476,9 @@ public class Game extends Canvas {
         TOTAL_RUNNERS = runners.size();
         TOTAL_SHOOTERS = shooters.size();
         TOTAL_BIGSQUARES = bigSquares.size();
+        TOTAL_HEXAGONS = hexagons.size();
     
-        System.out.println("Wave " + wave + " started! Runners: " + TOTAL_RUNNERS + " | Shooters: " + TOTAL_SHOOTERS + " | BigSquares: " + TOTAL_BIGSQUARES);
+        System.out.println("Wave " + wave + " started! Runners: " + TOTAL_RUNNERS + " | Shooters: " + TOTAL_SHOOTERS + " | BigSquares: " + TOTAL_BIGSQUARES + " | Hexagons: " + TOTAL_HEXAGONS);
     }
     
     
@@ -485,6 +505,16 @@ public class Game extends Canvas {
                 int newY = rand.nextInt(WORLD_HEIGHT);
                 bigSquare.setX(newX);
                 bigSquare.setY(newY);
+            }
+        }
+
+        for (Hexagon hexagon : hexagons) {
+            if (hexagon.Collision(player)) {
+                player.setHealth(player.getHealth() - 3);
+                int newX = rand.nextInt(WORLD_WIDTH);
+                int newY = rand.nextInt(WORLD_HEIGHT);
+                hexagon.setX(newX);
+                hexagon.setY(newY);
             }
         }
     
@@ -551,6 +581,22 @@ public class Game extends Canvas {
                     }
                 }
             }
+
+            if (!collided) {
+                Iterator<Hexagon> hexagonIterator = hexagons.iterator();
+                while (hexagonIterator.hasNext()) {
+                    Hexagon hexagon = hexagonIterator.next();
+                    if (missile.Collision(hexagon)) {
+                        hexagon.setHealth(hexagon.getHealth() - 1);
+                        if (hexagon.getHealth() <= 0) {
+                            hexagonIterator.remove();
+                            score += hexagon.getValue();
+                        }
+                        collided = true;
+                        break;
+                    }
+                }
+            }
     
             if (collided) {
                 missileIterator.remove();
@@ -568,7 +614,7 @@ public class Game extends Canvas {
         }
     
         // Wave done check
-        if (runners.isEmpty() && shooters.isEmpty() && bigSquares.isEmpty()) {
+        if (runners.isEmpty() && shooters.isEmpty() && bigSquares.isEmpty() && hexagons.isEmpty()) {
             waveInProgress = false;
         }
     }
