@@ -13,7 +13,7 @@ public class Shooter extends Enemies {
     }
 
     public Shooter(int x, int y, int w, int h, int speed) {
-        super(x, y, w, h, speed, 2, null); // no image
+        super(x, y, w, h, speed,10, 10, 2, null); // no image
     }
 
     @Override
@@ -27,6 +27,29 @@ public class Shooter extends Enemies {
             new double[] { screenY, screenY + getHeight(), screenY + getHeight() },
             3
         );
+
+        double barWidth = getWidth();
+        double barHeight = 10;
+        double healthPercent = (double) getHealth() / getMaxHealth();
+        double currentBarWidth = barWidth * healthPercent;
+    
+        double barX = screenX;
+        double barY = screenY - 15; // 7 pixels above the top point of the triangle
+    
+        // Background bar (gray)
+        gc.setFill(Color.DARKGRAY);
+        gc.fillRect(barX, barY, barWidth, barHeight);
+    
+        // Health bar color (green/orange/red)
+        Color barColor = Color.LIME;
+        if (healthPercent < 0.5) barColor = Color.ORANGE;
+        if (healthPercent < 0.25) barColor = Color.RED;
+    
+        // Current health foreground bar
+        gc.setFill(barColor);
+        gc.fillRect(barX, barY, currentBarWidth, barHeight);
+
+        
     }
 
     

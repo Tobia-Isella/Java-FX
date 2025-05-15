@@ -37,8 +37,10 @@ public class Game extends Canvas {
     private Character player;
     private ArrayList<Runner> runners = new ArrayList<>();
     private ArrayList<Shooter> shooters = new ArrayList<>();
+    private ArrayList<BigSquare> bigSquares = new ArrayList<>();
     private ArrayList<Missile> missiles = new ArrayList<>();
     private ArrayList<EnemyMissile> enemyMissiles = new ArrayList<>();
+
 
     private Button startButton;
     private Button continueButton;
@@ -64,6 +66,7 @@ public class Game extends Canvas {
 
     private int TOTAL_RUNNERS;
     private int TOTAL_SHOOTERS;
+    private int TOTAL_BIGSQUARES;
 
 
     private int fps = 0; 
@@ -140,8 +143,21 @@ public class Game extends Canvas {
             if (shooters.size() >= 0 ) break;
         }
 
+        for (int i = 0; i < 1000; i++) {
+            double x = Math.random() * WORLD_WIDTH;
+            double y = Math.random() * WORLD_HEIGHT;
+        
+            double value = OpenSimplex2S.noise2(seed, x * 0.001, y * 0.001);
+            if (value > 0.4) {
+                bigSquares.add(new BigSquare((int)x, (int)y, 200, 200, 3));
+            }
+        
+            if (bigSquares.size() >= 0 ) break;
+        }
+
         TOTAL_RUNNERS = runners.size();
         TOTAL_SHOOTERS = shooters.size();
+        TOTAL_BIGSQUARES = bigSquares.size();
     
         setFocusTraversable(true);
     }
@@ -217,10 +233,14 @@ public class Game extends Canvas {
             currentState = GameState.END_SCREEN;
         }
 
-        //Update Enemies 
         for (Runner runner : runners) {
             runner.moveTowardsPlayer(player.getX(), player.getY(), new ArrayList<>(runners));
         }
+
+        for (BigSquare bigSquare : bigSquares) {
+            bigSquare.moveTowardsPlayer(player.getX(), player.getY(), new ArrayList<>(bigSquares));
+        }
+
         for (Shooter shooter : shooters) {
             shooter.HoverPlayer(player.getX(), player.getY(), new ArrayList<>(shooters));
             shooter.maybeFireMissile(enemyMissiles, player.getX(), player.getY());
@@ -256,11 +276,12 @@ public class Game extends Canvas {
         }
         }
         //update wave 
-        if (!waveInProgress && runners.isEmpty() && shooters.isEmpty()) {
+        if (!waveInProgress && runners.isEmpty() && shooters.isEmpty() && bigSquares.isEmpty()) {
             if (currentWave < MAX_WAVES) {
                 currentWave++;
                 startWave(currentWave);
                 waveInProgress = true;
+                System.out.println("Checking wave: Runners=" + runners.size() + " Shooters=" + shooters.size() + " BigSquares=" + bigSquares.size());
             }
         }
 
@@ -339,6 +360,10 @@ public class Game extends Canvas {
         for (Shooter shooter : shooters) {
             shooter.drawActor(gc, cameraX, cameraY);
         }
+        for (BigSquare bigSquare : bigSquares) {
+            bigSquare.drawActor(gc, cameraX, cameraY);
+        }
+        
         
 
         // Weapons
@@ -379,8 +404,8 @@ public class Game extends Canvas {
 
         gc.setFill(Color.BLACK);
 
-        int enemiesLeft = runners.size() + shooters.size();
-        int totalEnemies = TOTAL_RUNNERS + TOTAL_SHOOTERS;
+        int enemiesLeft = runners.size() + shooters.size() + bigSquares.size();
+        int totalEnemies = TOTAL_RUNNERS + TOTAL_SHOOTERS + TOTAL_BIGSQUARES;
         String enemyText = "Enemies: " + enemiesLeft + "/" + totalEnemies;
 
         double textWidth = getTextWidth(enemyText);
@@ -393,34 +418,49 @@ public class Game extends Canvas {
     }
     
     public void startWave(int wave) {
-        int numRunners = 5 + wave * 2;   // Increase runners each wave
-        int numShooters = 1 + wave / 2; // Increase shooters more slowly
+        int numRunners = 5 + wave * 2;
+        int numShooters = (wave >= 3) ? 1 + wave / 2 : 0;
+        int numBigSquares = (wave >= 7) ? 1 + wave / 2 : 0;
     
-        long seed = System.nanoTime();  // Use a different seed per wave
+        long seed = System.nanoTime();
     
         int placedRunners = 0;
         int placedShooters = 0;
+        int placedBigSquares = 0;
     
-        for (int i = 0; i < 10000 && (placedRunners < numRunners || placedShooters < numShooters); i++) {
+        for (int i = 0; i < 10000 && (placedRunners < numRunners || placedShooters < numShooters || placedBigSquares < numBigSquares); i++) {
             double x = Math.random() * WORLD_WIDTH;
             double y = Math.random() * WORLD_HEIGHT;
-    
             double value = OpenSimplex2S.noise2(seed, x * 0.001, y * 0.001);
-            
+    
+            // Try placing BigSquare (only from wave 7 onward)
+            if (wave >= 7 && value > 0.6 && placedBigSquares < numBigSquares) {
+                bigSquares.add(new BigSquare((int) x, (int) y, 200, 200, 3));
+                placedBigSquares++;
+                continue;
+            }
+    
+            // Try placing Shooter (only from wave 3 onward)
+            if (wave >= 3 && value > 0.5 && placedShooters < numShooters) {
+                shooters.add(new Shooter((int) x, (int) y, 50, 50, 5));
+                placedShooters++;
+                continue;
+            }
+    
+            // Always place Runners
             if (value > 0.4 && placedRunners < numRunners) {
                 runners.add(new Runner((int) x, (int) y, 50, 50, 5));
                 placedRunners++;
-            } else if (value > 0.4 && placedShooters < numShooters) {
-                shooters.add(new Shooter((int) x, (int) y, 50, 50, 5));
-                placedShooters++;
             }
         }
     
         TOTAL_RUNNERS = runners.size();
         TOTAL_SHOOTERS = shooters.size();
+        TOTAL_BIGSQUARES = bigSquares.size();
     
-        System.out.println("Wave " + wave + " started! Runners: " + TOTAL_RUNNERS + " | Shooters: " + TOTAL_SHOOTERS);
+        System.out.println("Wave " + wave + " started! Runners: " + TOTAL_RUNNERS + " | Shooters: " + TOTAL_SHOOTERS + " | BigSquares: " + TOTAL_BIGSQUARES);
     }
+    
     
 
     public void collisionEvent() {
@@ -430,7 +470,6 @@ public class Game extends Canvas {
         for (Runner runner : runners) {
             if (runner.Collision(player)) {
                 player.setHealth(player.getHealth() - 1);
-    
                 int newX = rand.nextInt(WORLD_WIDTH);
                 int newY = rand.nextInt(WORLD_HEIGHT);
                 runner.setX(newX);
@@ -438,67 +477,103 @@ public class Game extends Canvas {
             }
         }
     
+        // Handle collisions for big squares
+        for (BigSquare bigSquare : bigSquares) {
+            if (bigSquare.Collision(player)) {
+                player.setHealth(player.getHealth() - 3);
+                int newX = rand.nextInt(WORLD_WIDTH);
+                int newY = rand.nextInt(WORLD_HEIGHT);
+                bigSquare.setX(newX);
+                bigSquare.setY(newY);
+            }
+        }
+    
         // Handle collisions for shooters
         for (Shooter shooter : shooters) {
             if (shooter.Collision(player)) {
                 player.setHealth(player.getHealth() - 1);
-    
                 int newX = rand.nextInt(WORLD_WIDTH);
                 int newY = rand.nextInt(WORLD_HEIGHT);
                 shooter.setX(newX);
                 shooter.setY(newY);
             }
         }
-
+    
+        // Handle missile collisions
         Iterator<Missile> missileIterator = missiles.iterator();
         while (missileIterator.hasNext()) {
             Missile missile = missileIterator.next();
             boolean collided = false;
+    
             Iterator<Runner> runnerIterator = runners.iterator();
             while (runnerIterator.hasNext()) {
                 Runner runner = runnerIterator.next();
                 if (missile.Collision(runner)) {
-                    runnerIterator.remove();
+                    runner.setHealth(runner.getHealth() - 1);
+                    if (runner.getHealth() <= 0) {
+                        runnerIterator.remove();
+                        score += runner.getValue();
+                        System.out.println("Runner hit! Health now: " + runner.getHealth());
+                    }
                     collided = true;
-                    score = score + runner.getValue();
                     break;
                 }
-            }   
-
+            }
+    
             if (!collided) {
                 Iterator<Shooter> shooterIterator = shooters.iterator();
                 while (shooterIterator.hasNext()) {
                     Shooter shooter = shooterIterator.next();
                     if (missile.Collision(shooter)) {
-                        shooterIterator.remove();
+                        shooter.setHealth(shooter.getHealth() - 1);
+                        if (shooter.getHealth() <= 0) {
+                            shooterIterator.remove();
+                            score += shooter.getValue();
+                        }
                         collided = true;
-                        score = score + shooter.getValue();
                         break;
                     }
                 }
             }
-
+    
+            if (!collided) {
+                Iterator<BigSquare> bigSquareIterator = bigSquares.iterator();
+                while (bigSquareIterator.hasNext()) {
+                    BigSquare bigSquare = bigSquareIterator.next();
+                    if (missile.Collision(bigSquare)) {
+                        bigSquare.setHealth(bigSquare.getHealth() - 1);
+                        if (bigSquare.getHealth() <= 0) {
+                            bigSquareIterator.remove();
+                            score += bigSquare.getValue();
+                        }
+                        collided = true;
+                        break;
+                    }
+                }
+            }
+    
             if (collided) {
                 missileIterator.remove();
             }
         }
-
+    
+        // Handle collisions for enemy missiles
         Iterator<EnemyMissile> enemyIter = enemyMissiles.iterator();
         while (enemyIter.hasNext()) {
             EnemyMissile m = enemyIter.next();
             if (m.Collision(player)) {
                 player.setHealth(player.getHealth() - 5); // Or any damage value
                 enemyIter.remove();
-    }
-}
-
-
-        if (runners.isEmpty() && shooters.isEmpty()) {
+            }
+        }
+    
+        // Wave done check
+        if (runners.isEmpty() && shooters.isEmpty() && bigSquares.isEmpty()) {
             waveInProgress = false;
         }
-
     }
-
+    
+    
     public void setupDropdownButton(Pane root) {
         dropdownButton = new Button();
         setupSmallButton(dropdownButton, "UPGRADES");

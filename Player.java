@@ -4,7 +4,7 @@ import javafx.scene.image.Image;
 public class Player {
 
     private double x, y, dx, dy;
-    private int width, height, health, speed, value;
+    private int width, height, health, speed, value, maxHealth, dmg;
     private Image pic;
     private int lastDx = 0;
     private int lastDy = 0;
@@ -20,7 +20,7 @@ public class Player {
 
     public Player() {}
 
-    public Player(int x, int y, int dx, int dy, int speed, int width, int height, int health, Image pic) {
+    public Player(int x, int y, int dx, int dy, int speed, int width, int height, int health, int maxHealth, Image pic) {
         this.x = x;
         this.y = y;
         this.dx = dx;
@@ -30,9 +30,10 @@ public class Player {
         this.pic = pic;
         this.health =health;
         this.speed =speed;
+        this.maxHealth = maxHealth;
     }
 
-    public Player(int x, int y, int speed, int value, int width, int height, Image pic) {
+    public Player(int x, int y, int speed, int health, int maxHealth, int value, int width, int height, Image pic) {
         this.x = x;
         this.y = y;
         this.speed =speed;
@@ -40,18 +41,49 @@ public class Player {
         this.height = height;
         this.pic = pic;
         this.value =value;
+        this.health =health;
+        this.maxHealth =maxHealth;
        
     }
 
+
+   
     public void drawActor(GraphicsContext gc, int cameraX, int cameraY) {
+        double screenX = x - cameraX;
+        double screenY = y - cameraY;
+
+        // Draw image or rectangle
         if (pic != null) {
-            gc.drawImage(pic, x - cameraX, y - cameraY, width, height);
+            gc.drawImage(pic, screenX, screenY, width, height);
         } else {
             gc.setFill(javafx.scene.paint.Color.BLUE);
-            gc.fillRect(x - cameraX, y - cameraY, width, height);
+            gc.fillRect(screenX, screenY, width, height);
         }
-    }
 
+        // --- Health Bar Drawing ---
+        double barWidth = width;
+        double barHeight = 8;
+        double healthPercent = (double) health / maxHealth;
+        double currentBarWidth = barWidth * healthPercent;
+
+        // Bar position (above the actor)
+        double barX = screenX;
+        double barY = screenY - 15; // 7 pixels above the top of the actor
+
+        // Background (gray)
+        gc.setFill(javafx.scene.paint.Color.DARKGRAY);
+        gc.fillRect(barX, barY, barWidth, barHeight);
+
+        // Foreground (green/yellow/red based on health)
+        javafx.scene.paint.Color barColor = javafx.scene.paint.Color.LIME;
+        if (healthPercent < 0.5) barColor = javafx.scene.paint.Color.ORANGE;
+        if (healthPercent < 0.25) barColor = javafx.scene.paint.Color.RED;
+
+        gc.setFill(barColor);
+        gc.fillRect(barX, barY, currentBarWidth, barHeight);
+    }
+    
+        
     public void move(int worldWidth, int worldHeight) {
         x += dx;
         y += dy;
@@ -98,6 +130,9 @@ public class Player {
     public double getDX() { return dx; }
     public double getDY() { return dy; }
     public int getValue() { return (int) value; }
+    public int getMaxHealth() { return (int) maxHealth; }
+    public Image getPic() { return (Image) pic; }
+    
 
     public int getLastDx() {
         return lastDx;
@@ -123,14 +158,15 @@ public class Player {
             lastDx = 0;
         }
     }
+
     public void setX(int x) { this.x = x; }
     public void setY(int y) { this.y = y; }
     public void setHealth(int health) { this.health = health; }
     public void setWidth(int width) { this.width = width; }
     public void setHeight(int height) { this.height = height; }
     public void setSpeed(int speed) { this.speed = speed; }
-
     public void setImage(Image pic) { this.pic = pic; }
+    public void setMaxHealth(int maxHealth ) { this.maxHealth = maxHealth; }
 
     public long getLastDashTime() {
         return lastDashTime;

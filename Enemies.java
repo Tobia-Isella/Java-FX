@@ -10,8 +10,8 @@ public class Enemies extends Player {
         super();
     }
 
-    public Enemies(int x, int y, int w, int h, int speed, int value, Image pic) {
-        super(x, y, speed, value, w, h, pic );
+    public Enemies(int x, int y, int w, int h, int speed, int health, int maxHealth, int value, Image pic) {
+        super(x, y, speed, health, maxHealth, value, w, h, pic );
     }
 
     public void moveTowardsPlayer(int playerX, int playerY, ArrayList<Enemies> allEnemies) {
@@ -33,6 +33,8 @@ public class Enemies extends Player {
                 double pushStrength = Math.min(1.0, 1.0 / distance);
                 separationX -= (other.getX() - getX()) * pushStrength;
                 separationY -= (other.getY() - getY()) * pushStrength;
+
+                
             }
         }
     
