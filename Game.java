@@ -11,6 +11,9 @@ import javafx.scene.paint.Paint;
 import javafx.scene.input.MouseEvent;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 
 import javafx.scene.text.Font;
@@ -41,6 +44,14 @@ public class Game extends Canvas {
     private ArrayList<Hexagon> hexagons = new ArrayList<>();
     private ArrayList<Missile> missiles = new ArrayList<>();
     private ArrayList<EnemyMissile> enemyMissiles = new ArrayList<>();
+    private ArrayList<Bomb> bombs = new ArrayList<>();
+    private Queue<BombSpawnTask> bombSpawnQueue = new LinkedList<>();
+    private Boss boss;
+
+    private List<ShieldCoin> shieldCoins = new ArrayList<>();
+    private List<DamageCoin> x2Coins = new ArrayList<>();
+
+
 
 
     private Button startButton;
@@ -51,6 +62,8 @@ public class Game extends Canvas {
     
     private UpgradeButton healthButton = new UpgradeButton("HEALTH +1", 10);
     private UpgradeButton speedButton = new UpgradeButton("SPEED +1", 15);
+    private UpgradeButton DMGButton = new UpgradeButton("DAMAGE +1", 50);
+
 
 
     private Button exitButton;  
@@ -64,6 +77,8 @@ public class Game extends Canvas {
 
     private final int WORLD_WIDTH = 10000;
     private final int WORLD_HEIGHT = 10000;
+    private final double bombsToSpawnPerFrame = 0.5;  // For example, half a bomb per frame on average
+    private double bombSpawnAccumulator = 0;
 
     private int TOTAL_RUNNERS;
     private int TOTAL_SHOOTERS;
@@ -80,6 +95,7 @@ public class Game extends Canvas {
     private final int MAX_WAVES = 10;
 
     private int score = 0;
+    private int missileDMG = 1;
 
 
     String playerUUID = AccountManager.getOrCreateUUID();
@@ -230,6 +246,17 @@ public class Game extends Canvas {
     }    
 
     public void update() {
+        long currentTime = System.currentTimeMillis();  // update every frame!
+
+        // Inside your update loop or bomb spawning method:
+        bombSpawnAccumulator += bombsToSpawnPerFrame;
+
+        while (bombSpawnAccumulator >= 1 && !bombSpawnQueue.isEmpty()) {
+            BombSpawnTask task = bombSpawnQueue.poll();
+            bombs.add(new Bomb(task.startX, task.startY, task.vx, task.vy, task.minDist, task.maxDist));
+            bombSpawnAccumulator -= 1;
+        }
+
 
         if (player.getHealth()<=0){
             currentState = GameState.END_SCREEN;
@@ -251,7 +278,17 @@ public class Game extends Canvas {
             shooter.HoverPlayer(player.getX(), player.getY(), new ArrayList<>(shooters));
             shooter.maybeFireMissile(enemyMissiles, player.getX(), player.getY());
         }
-        
+
+        if (boss != null) {
+            boss.moveTowardsPlayer(player.getX(), player.getY(), new ArrayList<>()); // or custom AI
+            boss.tryFireBombs(player, bombs);
+        }
+
+        for (Bomb bomb : bombs) {
+            bomb.update(currentTime);
+        }
+
+
         //Update Player
         player.move(WORLD_WIDTH, WORLD_HEIGHT);
 
@@ -279,8 +316,21 @@ public class Game extends Canvas {
             m.update();
             if (m.getX() < 0 || m.getX() > WORLD_WIDTH || m.getY() < 0 || m.getY() > WORLD_HEIGHT) {
                 enemyIter.remove();
+            }
         }
+
+        int removalsThisFrame = 0;
+        int maxRemovalsPerFrame = 1;  // tweak this number
+
+        Iterator<Bomb> Bombiter = bombs.iterator();
+        while (Bombiter.hasNext() && removalsThisFrame < maxRemovalsPerFrame) {
+            Bomb bomb = Bombiter.next();
+            if (bomb.shouldBeRemoved(currentTime)) {
+                Bombiter.remove();
+                removalsThisFrame++;
+            }
         }
+
         //update wave 
         if (!waveInProgress && runners.isEmpty() && shooters.isEmpty() && bigSquares.isEmpty()) {
             if (currentWave < MAX_WAVES) {
@@ -357,6 +407,15 @@ public class Game extends Canvas {
             gc.strokeLine(0 - cameraX, i - cameraY, WORLD_WIDTH - cameraX, i - cameraY);
         }
 
+        //consumables 
+        for (ShieldCoin coin : shieldCoins) {
+            coin.drawActor(gc, cameraX, cameraY);
+        }
+        for (DamageCoin coin : x2Coins) {
+            coin.drawActor(gc, cameraX, cameraY);
+        }
+
+
         // Actors
         player.drawActor(gc, cameraX, cameraY);
 
@@ -372,9 +431,12 @@ public class Game extends Canvas {
         for (Hexagon hexagon : hexagons) {
             hexagon.drawActor(gc, cameraX, cameraY);
         }
-        
-        
-        
+        if (boss != null) {
+            boss.drawActor(gc, cameraX, cameraY);
+        }
+        for (Bomb bomb : bombs) {
+            bomb.render(gc, cameraX, cameraY);  // Only draw bombs here
+        }
 
         // Weapons
         for (Missile m : missiles) {
@@ -394,6 +456,8 @@ public class Game extends Canvas {
                 System.out.println("Enemy missile image not loaded!");
             }
         }
+
+        
         
         
         //UI
@@ -426,8 +490,18 @@ public class Game extends Canvas {
 
 
     }
-    
     public void startWave(int wave) {
+        // Clear all enemies for a boss-only fight on wave 10
+        if (wave == 10) {
+            runners.clear();
+            shooters.clear();
+            bigSquares.clear();
+
+            // Spawn the boss enemy at center of the map (or a fixed location)
+            boss = new Boss(WORLD_WIDTH / 2 - 150, WORLD_HEIGHT / 2 - 150, 300, 300, 2, bombSpawnQueue); // Example size/speed
+            System.out.println("Wave 10 started! BOSS FIGHT!");
+            return;
+        }
         int numRunners = 5 + wave * 2;
         int numShooters = (wave >= 5) ? 1 + wave / 2 : 0;
         int numHexagons = (wave >= 3) ? 1 + wave * 2 : 0;
@@ -472,14 +546,38 @@ public class Game extends Canvas {
                 placedRunners++;
             }
         }
+        
+        // Consumables 
+        shieldCoins.clear();
+        x2Coins.clear();
+
+        int numShieldCoins = 20;  // adjust as needed
+        int numX2Coins = 50;      // adjust as needed
+        int placedShields = 0;
+        int placedX2s = 0;
+
+        for (int i = 0; i < 10000 && (placedShields < numShieldCoins || placedX2s < numX2Coins); i++) {
+            double x = Math.random() * WORLD_WIDTH;
+            double y = Math.random() * WORLD_HEIGHT;
+
+            if (placedShields < numShieldCoins && Math.random() < 0.02) {
+                shieldCoins.add(new ShieldCoin((int) x, (int) y, 200, 200));
+                placedShields++;
+            } else if (placedX2s < numX2Coins && Math.random() < 0.02) {
+                x2Coins.add(new DamageCoin((int) x, (int) y, 200, 200));
+                placedX2s++;
+            }
+        }
+
     
         TOTAL_RUNNERS = runners.size();
         TOTAL_SHOOTERS = shooters.size();
         TOTAL_BIGSQUARES = bigSquares.size();
         TOTAL_HEXAGONS = hexagons.size();
-    
+
         System.out.println("Wave " + wave + " started! Runners: " + TOTAL_RUNNERS + " | Shooters: " + TOTAL_SHOOTERS + " | BigSquares: " + TOTAL_BIGSQUARES + " | Hexagons: " + TOTAL_HEXAGONS);
     }
+    
     
     
 
@@ -510,7 +608,7 @@ public class Game extends Canvas {
 
         for (Hexagon hexagon : hexagons) {
             if (hexagon.Collision(player)) {
-                player.setHealth(player.getHealth() - 3);
+                player.setHealth(player.getHealth() - 1);
                 int newX = rand.nextInt(WORLD_WIDTH);
                 int newY = rand.nextInt(WORLD_HEIGHT);
                 hexagon.setX(newX);
@@ -539,7 +637,7 @@ public class Game extends Canvas {
             while (runnerIterator.hasNext()) {
                 Runner runner = runnerIterator.next();
                 if (missile.Collision(runner)) {
-                    runner.setHealth(runner.getHealth() - 1);
+                    runner.setHealth(runner.getHealth() - missile.getDMG());
                     if (runner.getHealth() <= 0) {
                         runnerIterator.remove();
                         score += runner.getValue();
@@ -555,7 +653,7 @@ public class Game extends Canvas {
                 while (shooterIterator.hasNext()) {
                     Shooter shooter = shooterIterator.next();
                     if (missile.Collision(shooter)) {
-                        shooter.setHealth(shooter.getHealth() - 1);
+                        shooter.setHealth(shooter.getHealth() - missile.getDMG());
                         if (shooter.getHealth() <= 0) {
                             shooterIterator.remove();
                             score += shooter.getValue();
@@ -571,7 +669,7 @@ public class Game extends Canvas {
                 while (bigSquareIterator.hasNext()) {
                     BigSquare bigSquare = bigSquareIterator.next();
                     if (missile.Collision(bigSquare)) {
-                        bigSquare.setHealth(bigSquare.getHealth() - 1);
+                        bigSquare.setHealth(bigSquare.getHealth() - missile.getDMG());
                         if (bigSquare.getHealth() <= 0) {
                             bigSquareIterator.remove();
                             score += bigSquare.getValue();
@@ -587,7 +685,7 @@ public class Game extends Canvas {
                 while (hexagonIterator.hasNext()) {
                     Hexagon hexagon = hexagonIterator.next();
                     if (missile.Collision(hexagon)) {
-                        hexagon.setHealth(hexagon.getHealth() - 1);
+                        hexagon.setHealth(hexagon.getHealth() - missile.getDMG());
                         if (hexagon.getHealth() <= 0) {
                             hexagonIterator.remove();
                             score += hexagon.getValue();
@@ -597,7 +695,18 @@ public class Game extends Canvas {
                     }
                 }
             }
-    
+
+            if (boss != null && missile.Collision(boss)) {
+                boss.setHealth(boss.getHealth() - missile.getDMG());
+                if (boss.getHealth() <= 0) {
+                    score += boss.getValue();
+                    boss = null;
+                    waveInProgress = false;
+                    System.out.println("Boss defeated!");
+                }
+                collided = true;
+            }
+
             if (collided) {
                 missileIterator.remove();
             }
@@ -612,6 +721,21 @@ public class Game extends Canvas {
                 enemyIter.remove();
             }
         }
+
+        for (Bomb bomb : bombs) {
+
+            if (bomb.hasExploded() && !bomb.hasDamagedPlayer()) {
+                double dx = player.getX() + player.getWidth() / 2.0 - (bomb.getX() + bomb.getW() / 2.0);
+                double dy = player.getY() + player.getHeight() / 2.0 - (bomb.getY() + bomb.getH() / 2.0);
+                double distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < Bomb.EXPLOSION_RADIUS) {
+                    player.setHealth(player.getHealth() - bomb.getDMG());
+                    bomb.setDamagedPlayer(true);
+                }
+            }
+        }
+
     
         // Wave done check
         if (runners.isEmpty() && shooters.isEmpty() && bigSquares.isEmpty() && hexagons.isEmpty()) {
@@ -642,8 +766,9 @@ public class Game extends Canvas {
     
         setupSmallButton(healthButton.button, "HEALTH +1");
         setupSmallButton(speedButton.button, "SPEED +1");
+        setupSmallButton(DMGButton.button, "DAMAGE +1");
     
-        dropdownOptions = new VBox(10, healthButton.button, speedButton.button);
+        dropdownOptions = new VBox(10, healthButton.button, speedButton.button, DMGButton.button);
         dropdownOptions.setVisible(false);
         dropdownOptions.setMouseTransparent(true);
         dropdownOptions.setPickOnBounds(false);
@@ -741,6 +866,12 @@ public class Game extends Canvas {
                 score -= speedButton.getcost();
                 speedButton.setCost(speedButton.getcost() * 2);
                 speedButton.updateButtonText();
+            } else if (text.equals("DAMAGE +1") && score >= DMGButton.getcost()) {
+                System.out.println("SPEED clicked!");
+                missileDMG++;
+                score -= DMGButton.getcost();
+                DMGButton.setCost(DMGButton.getcost() * 2);
+                DMGButton.updateButtonText();
             }
         });
     }
@@ -889,7 +1020,7 @@ public class Game extends Canvas {
         int mouseWorldX = (int) e.getX() + cameraX;
         int mouseWorldY = (int) e.getY() + cameraY;
     
-        Missile missile = new Missile(player.getX() + player.getWidth() / 2, player.getY() + player.getHeight() / 2, 20, 20, 10);
+        Missile missile = new Missile(player.getX() + player.getWidth() / 2, player.getY() + player.getHeight() / 2, 20, 20, missileDMG);
         missile.fireTowards(mouseWorldX, mouseWorldY);
         missiles.add(missile);
 

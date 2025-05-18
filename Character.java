@@ -7,7 +7,7 @@ public class Character extends Player {
     }
 
     public Character(int x, int y, int w, int h) {
-        super(x, y, 0, 0, 1, w, h, 3, 3, new Image("file:PlaceHolder.png"));
+        super(x, y, 0, 0, 1, w, h, 10000000, 10000000, new Image("file:PlaceHolder.png"));
     }
 
     @Override
