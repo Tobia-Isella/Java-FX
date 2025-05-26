@@ -3,7 +3,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.paint.Color;
 
 public class Bomb extends Weapons {
-    private static final Image SHARED_IMAGE = new Image("bomb.png"); // only loaded once
+    private static final Image SHARED_IMAGE = new Image("file:bomb.png"); // only loaded once
 
     private long spawnTime;
     private boolean exploded;

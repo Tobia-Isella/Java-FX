@@ -2,7 +2,10 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.input.KeyEvent;
 import javafx.animation.AnimationTimer;
+import javafx.animation.FadeTransition;
+import javafx.animation.ParallelTransition;
 import javafx.animation.RotateTransition;
+import javafx.animation.ScaleTransition;
 import javafx.animation.TranslateTransition;
 import javafx.geometry.Bounds;
 import javafx.geometry.Pos;
@@ -21,6 +24,7 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.image.Image;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
@@ -34,6 +38,10 @@ import javafx.util.Duration;
 public class Game extends Canvas {
     private final double width, height;
 
+    private MusicPlayer musicPlayer;
+
+    private Image popSheet = new Image("file:spriteSheet.png"); // adjust path as needed
+
     private double mouseX, mouseY;
     private GraphicsContext gc;
 
@@ -45,6 +53,9 @@ public class Game extends Canvas {
     private ArrayList<Missile> missiles = new ArrayList<>();
     private ArrayList<EnemyMissile> enemyMissiles = new ArrayList<>();
     private ArrayList<Bomb> bombs = new ArrayList<>();
+    private ArrayList<PopEffect> popEffects = new ArrayList<>();
+
+
     private Queue<BombSpawnTask> bombSpawnQueue = new LinkedList<>();
     private Boss boss;
 
@@ -92,10 +103,20 @@ public class Game extends Canvas {
 
     private int currentWave = 0;
     private boolean waveInProgress = false;
+    private boolean clearX2Coins =false;
+    private boolean clearShieldCoins =false;
     private final int MAX_WAVES = 10;
 
     private int score = 0;
     private int missileDMG = 1;
+
+    private int numShieldCoins = 5;  // adjust as needed
+    private int numX2Coins = 10;      // adjust as needed
+    private int placedShields = 0;
+    private int placedX2s = 0;
+
+    private int coinsPerFrame = 1; // or 1, adjust as needed
+    private int coinsRemovedPerFrame = 1; // You can tune this based on performance
 
 
     String playerUUID = AccountManager.getOrCreateUUID();
@@ -180,8 +201,13 @@ public class Game extends Canvas {
         setFocusTraversable(true);
     }
     public void start() {
+
+        musicPlayer = new MusicPlayer("BackGround.mp3");
+        musicPlayer.play();
+
         AnimationTimer timer = new AnimationTimer() {
             long lastTime = System.nanoTime();
+
     
             @Override
             public void handle(long now) {
@@ -257,7 +283,6 @@ public class Game extends Canvas {
             bombSpawnAccumulator -= 1;
         }
 
-
         if (player.getHealth()<=0){
             currentState = GameState.END_SCREEN;
         }
@@ -288,6 +313,56 @@ public class Game extends Canvas {
             bomb.update(currentTime);
         }
 
+        Iterator<PopEffect> effectIterator = popEffects.iterator();
+        while (effectIterator.hasNext()) {
+            PopEffect effect = effectIterator.next();
+            effect.update();
+            if (effect.isFinished()) {
+                effectIterator.remove();
+            }
+        }
+
+
+        // Gradually clear shieldCoins
+        if (clearShieldCoins) {
+            for (int i = 0; i < coinsRemovedPerFrame && !shieldCoins.isEmpty(); i++) {
+                shieldCoins.remove(shieldCoins.size() - 1);
+            }
+            if (shieldCoins.isEmpty()) {
+                clearShieldCoins = false;
+            }
+        }
+
+        // Gradually clear x2Coins
+        if (clearX2Coins) {
+            for (int i = 0; i < coinsRemovedPerFrame && !x2Coins.isEmpty(); i++) {
+                x2Coins.remove(x2Coins.size() - 1);
+            }
+            if (x2Coins.isEmpty()) {
+                clearX2Coins = false;
+            }
+        }
+
+
+        // Spawn shield coins only after previous ones are cleared
+        if (!clearShieldCoins) {
+            for (int i = 0; i < coinsPerFrame && placedShields < numShieldCoins; i++) {
+                double x = Math.random() * WORLD_WIDTH;
+                double y = Math.random() * WORLD_HEIGHT;
+                shieldCoins.add(new ShieldCoin((int) x, (int) y, 150, 150));
+                placedShields++;
+            }
+        }
+
+        // Spawn x2 coins only after previous ones are cleared
+        if (!clearX2Coins) {
+            for (int i = 0; i < coinsPerFrame && placedX2s < numX2Coins; i++) {
+                double x = Math.random() * WORLD_WIDTH;
+                double y = Math.random() * WORLD_HEIGHT;
+                x2Coins.add(new DamageCoin((int) x, (int) y, 150, 150));
+                placedX2s++;
+            }
+        }
 
         //Update Player
         player.move(WORLD_WIDTH, WORLD_HEIGHT);
@@ -408,16 +483,21 @@ public class Game extends Canvas {
         }
 
         //consumables 
-        for (ShieldCoin coin : shieldCoins) {
-            coin.drawActor(gc, cameraX, cameraY);
+        for (ShieldCoin Scoin : shieldCoins) {
+            Scoin.drawActor(gc, cameraX, cameraY);
         }
-        for (DamageCoin coin : x2Coins) {
-            coin.drawActor(gc, cameraX, cameraY);
+        for (DamageCoin Dcoin : x2Coins) {
+            Dcoin.drawActor(gc, cameraX, cameraY);
         }
 
 
         // Actors
         player.drawActor(gc, cameraX, cameraY);
+
+        for (PopEffect effect : popEffects) {
+            effect.draw(gc, cameraX, cameraY);
+        }
+
 
         for (Runner runner : runners) {
             runner.drawActor(gc, cameraX, cameraY);
@@ -437,6 +517,7 @@ public class Game extends Canvas {
         for (Bomb bomb : bombs) {
             bomb.render(gc, cameraX, cameraY);  // Only draw bombs here
         }
+   
 
         // Weapons
         for (Missile m : missiles) {
@@ -526,7 +607,7 @@ public class Game extends Canvas {
                 continue;
             }
 
-            if (wave >= 0 && value > 0.6 && placedHexagons < numHexagons) {
+            if (wave >= 3 && value > 0.6 && placedHexagons < numHexagons) {
                 hexagons.add(new Hexagon((int) x, (int) y, 50, 50, 10));
                 placedHexagons++;
                 continue;
@@ -534,7 +615,7 @@ public class Game extends Canvas {
     
     
             // Try placing Shooter (only from wave 3 onward)
-            if (wave >= 3 && value > 0.5 && placedShooters < numShooters) {
+            if (wave >= 5 && value > 0.5 && placedShooters < numShooters) {
                 shooters.add(new Shooter((int) x, (int) y, 50, 50, 5));
                 placedShooters++;
                 continue;
@@ -547,29 +628,14 @@ public class Game extends Canvas {
             }
         }
         
-        // Consumables 
-        shieldCoins.clear();
-        x2Coins.clear();
+        //Consumables 
 
-        int numShieldCoins = 20;  // adjust as needed
-        int numX2Coins = 50;      // adjust as needed
-        int placedShields = 0;
-        int placedX2s = 0;
+        clearShieldCoins = true;
+        clearX2Coins = true; 
 
-        for (int i = 0; i < 10000 && (placedShields < numShieldCoins || placedX2s < numX2Coins); i++) {
-            double x = Math.random() * WORLD_WIDTH;
-            double y = Math.random() * WORLD_HEIGHT;
+        placedShields = 0;
+        placedX2s = 0;
 
-            if (placedShields < numShieldCoins && Math.random() < 0.02) {
-                shieldCoins.add(new ShieldCoin((int) x, (int) y, 200, 200));
-                placedShields++;
-            } else if (placedX2s < numX2Coins && Math.random() < 0.02) {
-                x2Coins.add(new DamageCoin((int) x, (int) y, 200, 200));
-                placedX2s++;
-            }
-        }
-
-    
         TOTAL_RUNNERS = runners.size();
         TOTAL_SHOOTERS = shooters.size();
         TOTAL_BIGSQUARES = bigSquares.size();
@@ -641,6 +707,7 @@ public class Game extends Canvas {
                     if (runner.getHealth() <= 0) {
                         runnerIterator.remove();
                         score += runner.getValue();
+                        popEffects.add(new PopEffect(runner.getX(), runner.getY(), popSheet));
                         System.out.println("Runner hit! Health now: " + runner.getHealth());
                     }
                     collided = true;
@@ -657,6 +724,7 @@ public class Game extends Canvas {
                         if (shooter.getHealth() <= 0) {
                             shooterIterator.remove();
                             score += shooter.getValue();
+                            popEffects.add(new PopEffect(shooter.getX(), shooter.getY(), popSheet));
                         }
                         collided = true;
                         break;
@@ -673,6 +741,7 @@ public class Game extends Canvas {
                         if (bigSquare.getHealth() <= 0) {
                             bigSquareIterator.remove();
                             score += bigSquare.getValue();
+                            popEffects.add(new PopEffect(bigSquare.getX(), bigSquare.getY(), popSheet));
                         }
                         collided = true;
                         break;
@@ -689,6 +758,7 @@ public class Game extends Canvas {
                         if (hexagon.getHealth() <= 0) {
                             hexagonIterator.remove();
                             score += hexagon.getValue();
+                            popEffects.add(new PopEffect(hexagon.getX(), hexagon.getY(), popSheet));
                         }
                         collided = true;
                         break;
@@ -983,12 +1053,12 @@ public class Game extends Canvas {
         }
         
     }
+
     private double getTextWidth(String text) {
         Text t = new Text(text);
         t.setFont(gc.getFont());
         return t.getLayoutBounds().getWidth();
     }
-    
 
     public void handleKeyPress(KeyEvent e) {
         switch (e.getCode()) {

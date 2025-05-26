@@ -53,8 +53,8 @@ public class Enemies extends Player {
     
 
     // Class field to store previous direction for smoothing (add to Enemies class)
-private double lastDirX = 0;
-private double lastDirY = 0;
+    private double lastDirX = 0;
+    private double lastDirY = 0;
 
 public void HoverPlayer(int playerX, int playerY, ArrayList<Enemies> allEnemies) {
     double dx = playerX - getX();

@@ -30,6 +30,12 @@ public class Consumables {
         }
     }
 
+    public boolean Collision(Player b) {
+		return( getX()+getWidth()>=b.getX() && getX()<=b.getX()+b.getWidth() && getY()+getHeight()>=b.getY() && getY()<=b.getY()+b.getHeight());
+
+	}
+
+
     public double getX() {
         return x;
     }

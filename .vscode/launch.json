@@ -1,13 +1,12 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "type": "java",
-        "name": "Launch JavaFX App",
-        "request": "launch",
-        "mainClass": "Main",
-        "vmArgs": "--module-path \"G:/My Drive/Comp sci/openjfx-17.0.14_windows-x64_bin-sdk (1)/javafx-sdk-17.0.14/lib\" --add-modules javafx.controls,javafx.fxml"
-      }
-    ]
-  }
-  
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Launch JavaFX App",
+      "request": "launch",
+      "mainClass": "Main",
+      "vmArgs": "--module-path \"G:/My Drive/Comp sci/openjfx-17.0.14_windows-x64_bin-sdk (1)/javafx-sdk-17.0.14/lib\" --add-modules=javafx.controls,javafx.fxml,javafx.media --add-exports=javafx.graphics/com.sun.glass.utils=ALL-UNNAMED --add-exports=javafx.media/com.sun.media.jfxmediaimpl=ALL-UNNAMED"
+    }
+  ]
+}

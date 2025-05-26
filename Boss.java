@@ -29,7 +29,7 @@ public class Boss extends Enemies {
         double dist = Math.sqrt(dx*dx + dy*dy);
 
         if (dist <= SHOOT_RADIUS && currentTime - lastBombTime >= BOMB_COOLDOWN) {
-            fireBombs(6, 1000, 5, player); // Example params, you can adjust
+            fireBombs(20, 1000, 5, player); // Example params, you can adjust
             lastBombTime = currentTime;
         }
     }
