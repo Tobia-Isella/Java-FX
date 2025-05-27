@@ -8,6 +8,7 @@ import javafx.animation.RotateTransition;
 import javafx.animation.ScaleTransition;
 import javafx.animation.TranslateTransition;
 import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
@@ -24,6 +25,7 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.Text;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
 import javafx.scene.image.Image;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Pane;
@@ -55,15 +57,17 @@ public class Game extends Canvas {
     private ArrayList<Bomb> bombs = new ArrayList<>();
     private ArrayList<PopEffect> popEffects = new ArrayList<>();
 
-
     private Queue<BombSpawnTask> bombSpawnQueue = new LinkedList<>();
     private Boss boss;
 
     private List<ShieldCoin> shieldCoins = new ArrayList<>();
     private List<DamageCoin> x2Coins = new ArrayList<>();
 
-
-
+    private Slider musicSlider = new Slider(0, 1, 0.5); // min, max, initial
+    private Slider sfxSlider = new Slider(0, 1, 0.5);
+    private Label musicLabel = new Label("Music Volume");
+    private Label sfxLabel = new Label("SFX Volume");
+    private VBox volumeControls = new VBox(10, musicLabel, musicSlider, sfxLabel, sfxSlider);
 
     private Button startButton;
     private Button continueButton;
@@ -105,19 +109,24 @@ public class Game extends Canvas {
     private boolean waveInProgress = false;
     private boolean clearX2Coins =false;
     private boolean clearShieldCoins =false;
-    private final int MAX_WAVES = 10;
+    private final int MAX_WAVES = 100;
 
     private int score = 0;
     private int missileDMG = 1;
 
-    private int numShieldCoins = 5;  // adjust as needed
-    private int numX2Coins = 10;      // adjust as needed
+    private int numShieldCoins = 10;  // adjust as needed
+    private int numX2Coins = 0;      // adjust as needed
     private int placedShields = 0;
     private int placedX2s = 0;
 
     private int coinsPerFrame = 1; // or 1, adjust as needed
     private int coinsRemovedPerFrame = 1; // You can tune this based on performance
 
+    private double waveDisplayTime = 0;
+    private final double WAVE_DISPLAY_DURATION = 3.0; // seconds to show the wave number
+    private double waveTextOpacity = 1.0;
+    private boolean showWaveText = false;
+    private int currentWaveNumber=1;
 
     String playerUUID = AccountManager.getOrCreateUUID();
     int coins = AccountManager.getCoinsFromServer(playerUUID); // get existing or 0
@@ -128,7 +137,8 @@ public class Game extends Canvas {
         START_SCREEN,
         GAME_SCREEN,
         END_SCREEN,
-        GAME_PAUSED
+        GAME_PAUSED,
+        OPTIONS_SCREEN
     }
 
     private GameState currentState = GameState.START_SCREEN;
@@ -222,7 +232,7 @@ public class Game extends Canvas {
                         dropdownButton.setVisible(false);
                         dropdownOptions.setVisible(false);
                         exitButton.setVisible(true);
-                        
+                        volumeControls.setVisible(false);
                         
 
                         break;
@@ -234,10 +244,20 @@ public class Game extends Canvas {
                         drawGameplay();
                         mainMenuButton.setVisible(false);
                         exitButton.setVisible(false);
-
+                        volumeControls.setVisible(false);
                         dropdownButton.setVisible(true);
-                        
 
+                        if (showWaveText) {
+                            waveDisplayTime += delta;  // deltaTime in seconds
+
+                            if (waveDisplayTime > 2.0) {
+                                waveTextOpacity = Math.max(0, 1 - (waveDisplayTime - 2.0));
+                            }
+
+                            if (waveDisplayTime >= WAVE_DISPLAY_DURATION) {
+                                showWaveText = false;
+                            }
+                        }
                         break;
 
                     case END_SCREEN:
@@ -247,13 +267,26 @@ public class Game extends Canvas {
                     case GAME_PAUSED:
 
                         drawGameplay();
-                        
+                        volumeControls.setVisible(false);
+                        mainMenuButton.setTranslateY(0);
                         gc.setFill(Color.rgb(0, 0, 0, 0.5)); // translucent overlay
                         gc.fillRect(0, 0, width, height);
 
                         mainMenuButton.setVisible(true);
                         exitButton.setVisible(false);
 
+
+
+                        break;
+                    
+                    case OPTIONS_SCREEN:
+
+                        drawOptions();
+                        mainMenuButton.setTranslateY(+400);
+                        mainMenuButton.setVisible(true);
+                        volumeControls.setVisible(true);
+                        exitButton.setVisible(false);
+                        startButton.setVisible(false);
 
 
                         break;
@@ -410,13 +443,14 @@ public class Game extends Canvas {
         if (!waveInProgress && runners.isEmpty() && shooters.isEmpty() && bigSquares.isEmpty()) {
             if (currentWave < MAX_WAVES) {
                 currentWave++;
+                SoundEffect.playSound("HitSound2.wav");
                 startWave(currentWave);
                 waveInProgress = true;
                 System.out.println("Checking wave: Runners=" + runners.size() + " Shooters=" + shooters.size() + " BigSquares=" + bigSquares.size());
             }
         }
 
-
+        // In your game update method:
 
     }
 
@@ -463,6 +497,55 @@ public class Game extends Canvas {
         gc.setFill(originalFill);
 
 
+
+    }
+
+    public void drawOptions(){
+        // Background
+
+        cameraX = player.getX() - (int) width / 2 + player.getWidth() / 2;
+        cameraY = player.getY() - (int) height / 2 + player.getHeight() / 2;
+
+        cameraX = Math.max(0, Math.min(cameraX, WORLD_WIDTH - (int) width));
+        cameraY = Math.max(0, Math.min(cameraY, WORLD_HEIGHT - (int) height));
+
+        gc.setFill(Color.LIGHTGRAY);
+        gc.fillRect(-cameraX, -cameraY, WORLD_WIDTH, WORLD_HEIGHT);
+ 
+        // Grid
+        gc.setStroke(Color.DARKGRAY);
+        for (int i = 0; i < WORLD_WIDTH; i += 100) {
+            gc.strokeLine(i - cameraX, 0 - cameraY, i - cameraX, WORLD_HEIGHT - cameraY);
+        }
+        for (int i = 0; i < WORLD_HEIGHT; i += 100) {
+            gc.strokeLine(0 - cameraX, i - cameraY, WORLD_WIDTH - cameraX, i - cameraY);
+        }
+
+        if (startButton != null) {
+            startButton.setVisible(true);
+        }
+
+        // Box
+        double boxWidth = 1000;
+        double boxHeight = 600;
+
+        // Centered X position on screen (relative to camera)
+        double centerX = cameraX + width / 2 - boxWidth / 2;
+        double boxY = (cameraY + height / 2 - boxHeight / 2) -100; // Centered vertically, optional
+
+        // Draw the box
+        gc.setFill(Color.DARKGRAY);
+        gc.fillRect(centerX - cameraX, boxY - cameraY, boxWidth, boxHeight);
+
+        // Optional border
+        gc.setStroke(Color.BLACK);
+        gc.strokeRect(centerX - cameraX, boxY - cameraY, boxWidth, boxHeight);
+
+        // sliders 
+        if (volumeControls != null) {
+        
+            volumeControls.setVisible(true);
+        }
 
     }
 
@@ -517,7 +600,6 @@ public class Game extends Canvas {
         for (Bomb bomb : bombs) {
             bomb.render(gc, cameraX, cameraY);  // Only draw bombs here
         }
-   
 
         // Weapons
         for (Missile m : missiles) {
@@ -538,10 +620,12 @@ public class Game extends Canvas {
             }
         }
 
-        
-        
+        if (showWaveText) {
+            drawWaveText(gc, waveTextOpacity);
+        }
         
         //UI
+        
         gc.setFill(Color.BLACK);
         gc.fillText("Health " + player.getHealth(), 1860, 20);
         gc.fillText("MouseX " + mouseX, 1840, 40);
@@ -569,11 +653,18 @@ public class Game extends Canvas {
         gc.fillText(enemyText, centerX, 40);
         gc.fillText("Wave: " + currentWave + "/" + MAX_WAVES, centerX, 20);
 
-
     }
+
+    public void startWaveDisplay(int waveNumber) {
+        currentWaveNumber = waveNumber;
+        waveDisplayTime = 0;
+        waveTextOpacity = 1.0;
+        showWaveText = true;
+    }
+
     public void startWave(int wave) {
         // Clear all enemies for a boss-only fight on wave 10
-        if (wave == 10) {
+        if (wave == 100) {
             runners.clear();
             shooters.clear();
             bigSquares.clear();
@@ -583,6 +674,7 @@ public class Game extends Canvas {
             System.out.println("Wave 10 started! BOSS FIGHT!");
             return;
         }
+
         int numRunners = 5 + wave * 2;
         int numShooters = (wave >= 5) ? 1 + wave / 2 : 0;
         int numHexagons = (wave >= 3) ? 1 + wave * 2 : 0;
@@ -642,10 +734,30 @@ public class Game extends Canvas {
         TOTAL_HEXAGONS = hexagons.size();
 
         System.out.println("Wave " + wave + " started! Runners: " + TOTAL_RUNNERS + " | Shooters: " + TOTAL_SHOOTERS + " | BigSquares: " + TOTAL_BIGSQUARES + " | Hexagons: " + TOTAL_HEXAGONS);
+
+        startWaveDisplay(wave);
     }
-    
-    
-    
+
+    private void drawWaveText(GraphicsContext gc, double opacity) {
+        Font originalFont = gc.getFont();
+        Paint originalFill = gc.getFill();
+
+        gc.setFill(Color.BLACK);
+        gc.setGlobalAlpha(opacity);
+        gc.setFont(Font.font("Arial", FontWeight.BOLD, 100));
+
+        String text = "Wave " + currentWaveNumber;
+
+        Text tempText = new Text(text);
+        tempText.setFont(gc.getFont());
+        double textWidth = tempText.getLayoutBounds().getWidth();
+
+        gc.fillText(text, (width - textWidth) / 2, 290);
+
+        gc.setGlobalAlpha(1.0);
+        gc.setFont(originalFont);
+        gc.setFill(originalFill);
+    }
 
     public void collisionEvent() {
         Random rand = new Random();
@@ -708,6 +820,7 @@ public class Game extends Canvas {
                         runnerIterator.remove();
                         score += runner.getValue();
                         popEffects.add(new PopEffect(runner.getX(), runner.getY(), popSheet));
+                        SoundEffect.playSound("Pop.mp3");
                         System.out.println("Runner hit! Health now: " + runner.getHealth());
                     }
                     collided = true;
@@ -725,6 +838,7 @@ public class Game extends Canvas {
                             shooterIterator.remove();
                             score += shooter.getValue();
                             popEffects.add(new PopEffect(shooter.getX(), shooter.getY(), popSheet));
+                            SoundEffect.playSound("Pop.mp3");
                         }
                         collided = true;
                         break;
@@ -742,6 +856,7 @@ public class Game extends Canvas {
                             bigSquareIterator.remove();
                             score += bigSquare.getValue();
                             popEffects.add(new PopEffect(bigSquare.getX(), bigSquare.getY(), popSheet));
+                            SoundEffect.playSound("Pop.mp3");
                         }
                         collided = true;
                         break;
@@ -759,6 +874,7 @@ public class Game extends Canvas {
                             hexagonIterator.remove();
                             score += hexagon.getValue();
                             popEffects.add(new PopEffect(hexagon.getX(), hexagon.getY(), popSheet));
+                            SoundEffect.playSound("Pop.mp3");
                         }
                         collided = true;
                         break;
@@ -813,6 +929,50 @@ public class Game extends Canvas {
         }
     }
     
+    public void setupSlider(Pane root) {
+
+        musicSlider.setShowTickLabels(true);
+        musicSlider.setShowTickMarks(true);
+        musicSlider.setMajorTickUnit(0.1);
+        musicSlider.setMaxWidth(280);
+
+        sfxSlider.setShowTickLabels(true);
+        sfxSlider.setShowTickMarks(true);
+        sfxSlider.setMajorTickUnit(0.1);
+        sfxSlider.setMaxWidth(280);
+
+        // VBox for sliders and labels
+        volumeControls.setSpacing(15);
+        volumeControls.setPadding(new Insets(15));
+        volumeControls.setAlignment(Pos.CENTER);
+        volumeControls.setStyle("-fx-background-color: rgba(200,200,200,0.8); -fx-background-radius: 10;");
+
+        // Set preferred and max size for VBox
+        volumeControls.setPrefWidth(320);
+        volumeControls.setPrefHeight(220);
+        volumeControls.setMaxWidth(320);
+        volumeControls.setMaxHeight(220);
+
+        // Center the volumeControls in the window
+        volumeControls.setLayoutX((width - volumeControls.getPrefWidth()) / 2);
+        volumeControls.setLayoutY((height - volumeControls.getPrefHeight()) / 2);
+
+        // Add to root
+        root.getChildren().add(volumeControls);
+
+        // Value listeners
+        musicSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            if (musicPlayer != null) {
+                musicPlayer.setVolume(newVal.doubleValue());
+            }
+        });
+
+        sfxSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+            SoundEffect.setVolume(newVal.doubleValue());
+        });
+
+        volumeControls.setVisible(false);
+    }
     
     public void setupDropdownButton(Pane root) {
         dropdownButton = new Button();
@@ -891,7 +1051,6 @@ public class Game extends Canvas {
     rotate.play();
 }
 
-
     private void setupSmallButton(Button button, String text) {
         button.setStyle("""
             -fx-font-size: 24px;
@@ -945,8 +1104,6 @@ public class Game extends Canvas {
             }
         });
     }
-
-
 
     public void setupStartButton(Pane root) {
         
@@ -1023,7 +1180,7 @@ public class Game extends Canvas {
             });
         } else if (text.equals("OPTIONS")) {
             button.setOnAction(e -> {
-                currentState = GameState.GAME_SCREEN; // Change to another state for options
+                currentState = GameState.OPTIONS_SCREEN; // Change to another state for options
                 optionsButton.setVisible(false);
                 startButton.setVisible(false);
                 continueButton.setVisible(false);
@@ -1089,13 +1246,18 @@ public class Game extends Canvas {
         // Convert screen coordinates to world coordinates
         int mouseWorldX = (int) e.getX() + cameraX;
         int mouseWorldY = (int) e.getY() + cameraY;
+        double centerX = player.getX() + player.getWidth() / 2;
+        double centerY = player.getY() + player.getHeight() / 2;
+
+        double angle = Math.atan2(mouseWorldY - centerY, mouseWorldX - centerX);
     
         Missile missile = new Missile(player.getX() + player.getWidth() / 2, player.getY() + player.getHeight() / 2, 20, 20, missileDMG);
         missile.fireTowards(mouseWorldX, mouseWorldY);
         missiles.add(missile);
 
         System.out.println("Mouse Clicked");
-
+        double particleX = player.getX() + player.getWidth() / 2;
+        double particleY = player.getY() + player.getHeight() / 2;
 
     }
     

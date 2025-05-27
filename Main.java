@@ -21,6 +21,7 @@ public class Main extends Application {
         root.getChildren().add(gameCanvas);
         gameCanvas.setupStartButton(root);
         gameCanvas.setupDropdownButton(root);
+        gameCanvas.setupSlider(root); // This should create volumeControls and add it to root
 
 
         Scene scene = new Scene(root, width, height);
